@@ -80,7 +80,8 @@ const CFG={
  alamat:'Gang Ratna, Jl. Sedap Malam',wa:'WA 0859-6265-4475',tagline:'Gratis antar jemput - Sesama tetangga',
  komplain:'Komplain pakaian hanya berlaku jika pakaian diambil maksimal 2 hari setelah selesai diproses, dan dikomplain maksimal 1 hari setelah pakaian diterima pelanggan dan dibuka. Di luar ketentuan tersebut, komplain tidak dapat diproses.',
  saran:'Kritik, saran, dan masukan terbuka kapan saja melalui WhatsApp Laundry Tetangga.',
- tutup:'Jangan biarkan cucian berat bikin harimu capek, serahkan saja semuanya ke kami. Terima kasih sudah berlangganan di Laundry Tetangga!'
+ tutup1:'Jangan biarkan CUCIAN BERAT bikin harimu CAPEK, serahkan saja semuanya ke KAMI.',
+ tutup2:'Terima kasih sudah berlangganan di Laundry Tetangga! 🥰'
 };
 const $=id=>document.getElementById(id);
 const rp=n=>'Rp'+Number(n||0).toLocaleString('id-ID');
@@ -225,16 +226,23 @@ function renderNota(n,s,pr){
   const left=(a,z,b,lh)=>wrap(a,z,b,W-20).forEach(l=>{f(z,b);t(l,10,'left');y+=lh});
   const row=(l,r,z,b,lh)=>{f(z,b);t(l,10,'left');t(r,W-10,'right');y+=lh};
   const dash=()=>{y+=2;x.save();x.setLineDash([3,3]);x.lineWidth=1;x.strokeStyle='#000';x.beginPath();x.moveTo(10,y);x.lineTo(W-10,y);x.stroke();x.restore();y+=6};
-  const L=pr?LOGOP:LOGO;if(L.complete&&L.naturalWidth){const lw=132;x.drawImage(L,(W-lw)/2,y,lw,lw);y+=lw+2}
-  if(pr)mid(CFG.tagline,11,1,14);mid(CFG.alamat,12,0,15);mid(CFG.wa,12,0,15);dash();
-  row('No',n.noNota,12,0,16);row('Masuk',n.tanggal,12,0,16);row('Estimasi',estimasi(n),12,1,16);row('Nama',n.nama,13,1,17);
+  const numd=(k,a)=>{const ls=wrap(a,11,0,W-36);f(11,1);t(k+'.',10,'left');ls.forEach(l=>{f(11,0);t(l,25,'left');y+=14})};
+  const L=pr?LOGOP:LOGO;if(L.complete&&L.naturalWidth){const lw=104;x.drawImage(L,(W-lw)/2,y,lw,lw);y+=lw+4}
+  if(pr)mid(CFG.tagline,11,1,14);mid(CFG.alamat,14,1,18);mid(CFG.wa,14,1,18);y+=16;dash();
+  row('No',n.noNota,12,0,16);row('Masuk',n.tanggal,12,0,16);row('Estimasi',estimasi(n),12,1,17);row('Nama',n.nama,15,1,20);
   if(n.keterangan)left('Ket: '+n.keterangan,12,0,15);dash();
   n.items.forEach(i=>{const sub=i.subtotal!=null?i.subtotal:Math.round(i.qty*i.harga);
    f(13,1);const nm=wrap(i.layanan,13,1,W-95);nm.forEach((l,k)=>{f(13,1);t(l,10,'left');if(k===0){t(Number(sub).toLocaleString('id-ID'),W-10,'right')}y+=16});
    row(num(i.qty)+' '+(i.satuan||'')+' x '+Number(i.harga).toLocaleString('id-ID'),'',11,0,14)});
-  dash();row('TOTAL',rp(n.total),17,1,22);row('Bayar',n.bayar==='Lunas'?'LUNAS - '+(n.metode||'Cash').toUpperCase():'BELUM LUNAS',13,1,18);dash();
-  left('Ketentuan komplain:',11,1,13);left(CFG.komplain,11,0,13);y+=3;left(CFG.saran,11,0,13);y+=4;
-  mid(CFG.tutup,11,1,13);return y+8};
+  dash();
+  x.fillStyle='#000';x.fillRect(8,y,W-16,28);x.fillStyle='#fff';y+=4;f(17,1);t('TOTAL',16,'left');t(rp(n.total),W-16,'right');y+=24;x.fillStyle='#000';y+=8;
+  const bt=n.bayar==='Lunas'?'LUNAS - '+(n.metode||'Cash').toUpperCase():'BELUM LUNAS';
+  f(13,1);t('Bayar',10,'left');const bw=x.measureText(bt).width+16;x.lineWidth=1.5;x.strokeStyle='#000';x.strokeRect(W-10-bw,y-3,bw,22);t(bt,W-18,'right');y+=26;
+  dash();
+  mid('Mohon dibaca ya Kakak 😊',13,1,19);y+=2;
+  numd(1,CFG.komplain);y+=3;numd(2,CFG.saran);
+  y+=16;
+  mid(CFG.tutup1,12,1,16);y+=8;mid(CFG.tutup2,12,1,16);return y+8};
  const tmp=document.createElement('canvas');tmp.width=W*s;tmp.height=4000*s;const H=Math.ceil(run(tmp));
  const cv=document.createElement('canvas');cv.width=W*s;cv.height=H*s;run(cv);return cv}
 
