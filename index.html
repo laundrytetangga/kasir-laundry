@@ -31,6 +31,8 @@ nav button{flex:1;border:0;border-radius:0;padding:14px 4px;color:var(--mu)}nav 
 #modal canvas{width:100%;max-width:340px;display:block;margin:0 auto 10px;border:1px solid var(--ln)}
 #pay button,#mbox .row button{font-size:14px;padding:11px 6px}
 .res{padding:0;max-height:230px;overflow:auto}.res div{display:flex;justify-content:space-between;gap:8px;padding:11px 12px;border-bottom:1px solid var(--ln);cursor:pointer}.res div:active{background:#e3efec}
+#bb{position:fixed;left:0;right:0;bottom:calc(52px + env(safe-area-inset-bottom));background:#fff;border-top:2px solid var(--y);padding:8px 10px;z-index:5;max-width:520px;margin:0 auto}#bb button{font-size:13px;padding:10px 4px;margin-top:6px}
+body.bulk{padding-bottom:200px}
 #toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#17302b;color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:99;max-width:90%}
 #login{max-width:340px;margin:20vh auto;text-align:center;padding:0 16px}#login img{width:200px}
 .hide{display:none!important}
@@ -47,7 +49,8 @@ nav button{flex:1;border:0;border-radius:0;padding:14px 4px;color:var(--mu)}nav 
 
  <section id="v-nota" class="hide"><h2>Daftar nota</h2>
   <input id="q" placeholder="Cari nama, nomor nota, atau WA">
-  <select id="fs"><option value="">Semua nota</option><option value="aktif">Belum diambil</option><option>Selesai</option><option>Diambil</option></select>
+  <select id="fs"><option value="">Semua nota</option><option value="belumselesai">Belum selesai</option><option value="Selesai">Selesai, belum diambil</option><option value="belumlunas">Belum lunas</option><option value="Diambil">Sudah diambil</option></select>
+  <button id="bm" class="hide" style="width:100%;margin-bottom:8px">Pilih banyak nota</button>
   <div id="list"></div></section>
 
  <section id="v-order" class="hide"><h2 id="ot">Order baru</h2>
@@ -64,11 +67,14 @@ nav button{flex:1;border:0;border-radius:0;padding:14px 4px;color:var(--mu)}nav 
   <button id="cancel" class="hide" style="width:100%;margin-top:8px">Batalkan ralat</button></section>
 
  <section id="v-keluar" class="hide"><h2>Pengeluaran</h2>
-  <div class="card"><input id="kk" list="kkl" placeholder="Kategori (listrik, deterjen, gaji...)"><datalist id="kkl"></datalist>
+  <div class="card"><select id="kk"><option value="">Pilih kategori</option></select>
   <input id="kd" placeholder="Keterangan (opsional)"><input id="kj" type="number" inputmode="numeric" placeholder="Jumlah (Rp)">
   <input id="kt" type="date"><button class="pri" id="ksave">Catat pengeluaran</button></div>
-  <div class="tot"><span>Bulan ini</span><span id="ktot"></span></div><div id="klist"></div></section>
+  <div class="tot"><span>Bulan ini</span><span id="ktot"></span></div><div id="kper" class="card hide"></div><div id="klist"></div></section>
 </main>
+<div id="bb" class="hide"><div class="mu" id="bi"></div>
+ <div class="row"><button data-k="s:Selesai">Selesai</button><button data-k="s:Diambil">Diambil</button><button data-k="b:Cash">Lunas Cash</button><button data-k="b:QRIS">Lunas QRIS</button></div>
+ <div class="row"><button data-k="all">Pilih semua</button><button data-k="x">Batal</button></div></div>
 <nav id="nav"></nav></div>
 
 <div id="modal"><div id="mbox"></div></div><div id="toast"></div>
@@ -87,7 +93,7 @@ const $=id=>document.getElementById(id);
 const rp=n=>'Rp'+Number(n||0).toLocaleString('id-ID');
 const num=n=>String(n).replace('.',',');
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let PIN=localStorage.getItem('pin')||'',USER=null,LAY=[],ITEMS=[],EDIT=null,TAB='',LASTKET='',PAY='Belum',SEL=null;
+let PIN=localStorage.getItem('pin')||'',USER=null,LAY=[],ITEMS=[],EDIT=null,TAB='',LASTKET='',PAY='Belum',SEL=null,BULK=false,SELS={};
 const LOGO=new Image(),LOGOP=new Image();LOGO.src='logo.png';LOGOP.src='logo_print.png';
 
 function toast(m){const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',3500)}
@@ -106,15 +112,15 @@ async function login(){
   const tabs=USER.role==='owner'?[['dash','Ringkasan'],['nota','Nota'],['order','Order'],['keluar','Pengeluaran']]:[['order','Order'],['nota','Nota']];
   $('nav').innerHTML=tabs.map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join('');
   $('nav').onclick=e=>e.target.dataset.t&&show(e.target.dataset.t);
-  fillLay();show(tabs[0][0]);
+  if(USER.role==='owner')$('bm').classList.remove('hide');fillLay();show(tabs[0][0]);
  }catch(e){PIN='';toast(e.message==='Failed to fetch'?'Tidak bisa terhubung. Cek internet dan URL API.':e.message)}}
 $('go').onclick=()=>{PIN=$('pin').value.trim();login()};
 $('out').onclick=()=>{localStorage.removeItem('pin');location.reload()};
-function show(t){TAB=t;['dash','nota','order','keluar'].forEach(x=>$('v-'+x).classList.toggle('hide',x!==t));
+function show(t){TAB=t;if(t!=='nota'&&BULK)setBulk(false);['dash','nota','order','keluar'].forEach(x=>$('v-'+x).classList.toggle('hide',x!==t));
  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
  if(t==='dash')loadDash();if(t==='nota')loadList();if(t==='keluar')loadKeluar()}
 setInterval(()=>{if(!USER||document.hidden||$('modal').style.display==='flex')return;
- if(TAB==='dash')loadDash();if(TAB==='nota'&&document.activeElement.id!=='q')loadList()},30000);
+ if(TAB==='dash')loadDash();if(TAB==='nota'&&!BULK&&document.activeElement.id!=='q')loadList()},30000);
 
 // ====== ORDER ======
 function fillLay(){SEL=null;$('ls').value='';$('lr').classList.add('hide')}
@@ -157,11 +163,24 @@ $('save').onclick=async()=>{
 let T;$('q').oninput=()=>{clearTimeout(T);T=setTimeout(loadList,400)};$('fs').onchange=loadList;
 async function loadList(){
  if(USER.role==='owner'&&!$('fs').querySelector('[value=Dihapus]'))$('fs').insertAdjacentHTML('beforeend','<option value="Dihapus">Dihapus</option>');
- try{const rows=(await api('pesanan',{q:$('q').value.trim(),status:$('fs').value})).data;
-  $('list').innerHTML=rows.length?rows.map((r,i)=>`<div class="card" data-i="${i}" style="cursor:pointer"><div class="row" style="align-items:center"><b>${esc(r.nama)}</b><b class="r">${rp(r.total)}</b></div>
-   <div class="mu">${r.noNota} - ${r.tanggal}</div><div style="margin-top:4px"><span class="bd ${r.status==='Dihapus'?'x':''}">${r.status}</span><span class="bd ${r.bayar==='Lunas'?'':'w'}">${r.bayar==='Lunas'?'Lunas'+(r.metode?' '+r.metode:''):'Belum lunas'}</span></div></div>`).join(''):'<p class="mu">Belum ada nota.</p>';
-  $('list')._rows=rows}catch(e){toast(e.message)}}
-$('list').onclick=e=>{const c=e.target.closest('[data-i]');if(c)detail($('list')._rows[+c.dataset.i])};
+ try{$('list')._rows=(await api('pesanan',{q:$('q').value.trim(),status:$('fs').value})).data;renderList();bulkInfo()}catch(e){toast(e.message)}}
+function renderList(){const rows=$('list')._rows||[];
+ $('list').innerHTML=rows.length?rows.map((r,i)=>{const on=BULK&&SELS[r.noNota];
+  return `<div class="card" data-i="${i}" style="cursor:pointer${on?';border-color:var(--g);background:#eaf4f1':''}"><div class="row" style="align-items:center"><b>${BULK?(on?'&#9745; ':'&#9744; '):''}${esc(r.nama)}</b><b class="r">${rp(r.total)}</b></div>
+   <div class="mu">${r.noNota} - ${r.tanggal}</div><div style="margin-top:4px"><span class="bd ${r.status==='Dihapus'?'x':''}">${r.status}</span><span class="bd ${r.bayar==='Lunas'?'':'w'}">${r.bayar==='Lunas'?'Lunas'+(r.metode?' '+r.metode:''):'Belum lunas'}</span></div></div>`}).join(''):'<p class="mu">Tidak ada nota.</p>'}
+function bulkInfo(){$('bi').textContent=Object.keys(SELS).length+' nota dipilih'}
+function setBulk(on){BULK=on;SELS={};$('bm').textContent=on?'Keluar dari mode pilih banyak':'Pilih banyak nota';document.body.classList.toggle('bulk',on);$('bb').classList.toggle('hide',!on);renderList();bulkInfo()}
+$('bm').onclick=()=>setBulk(!BULK);
+$('bb').onclick=async e=>{const k=e.target.dataset.k;if(!k)return;
+ if(k==='x')return setBulk(false);
+ if(k==='all'){($('list')._rows||[]).forEach(r=>SELS[r.noNota]=1);renderList();return bulkInfo()}
+ const ids=Object.keys(SELS);if(!ids.length)return toast('Pilih minimal satu nota');
+ const [t,v]=k.split(':');
+ if(!confirm(t==='s'?'Ubah status '+ids.length+' nota menjadi '+v+'?':'Tandai '+ids.length+' nota sebagai Lunas ('+v+')?'))return;
+ try{const j=t==='s'?await api('statusBanyak',{noNotas:ids,value:v}):await api('bayarBanyak',{noNotas:ids,value:'Lunas',metode:v});
+  toast(j.berhasil+' nota diperbarui'+(j.dilewati?', '+j.dilewati+' dilewati':''));SELS={};await loadList()}catch(err){toast(err.message)}};
+$('list').onclick=e=>{const c=e.target.closest('[data-i]');if(!c)return;const r=$('list')._rows[+c.dataset.i];
+ if(BULK){if(SELS[r.noNota])delete SELS[r.noNota];else SELS[r.noNota]=1;renderList();bulkInfo()}else detail(r)};
 
 async function detail(r){
  try{const items=(await api('detail',{noNota:r.noNota})).data;const n=Object.assign({},r,{items});
@@ -204,7 +223,8 @@ async function loadDash(){try{const d=(await api('dashboard')).data;
   c('Belum lunas',d.belumLunasJumlah+' nota',rp(d.belumLunasNominal))+c('Belum selesai',d.belumSelesai+' nota',d.belumDiambil+' selesai, belum diambil')
  }catch(e){toast(e.message)}}
 async function loadKeluar(){try{const d=(await api('pengeluaran')).data;$('ktot').textContent=rp(d.total);
- $('kkl').innerHTML=d.kategori.map(k=>`<option value="${esc(k)}">`).join('');
+ $('kper').classList.toggle('hide',!d.perKategori.length);$('kper').innerHTML=d.perKategori.map(k=>`<div class="li"><span>${esc(k.kategori)}</span><b>${rp(k.jumlah)}</b></div>`).join('');
+ {const cur=$('kk').value;$('kk').innerHTML='<option value="">Pilih kategori</option>'+d.kategori.map(k=>`<option>${esc(k)}</option>`).join('');$('kk').value=cur}
  $('klist').innerHTML=d.rows.length?d.rows.map(r=>`<div class="card"><div class="row"><b>${esc(r.kategori)}</b><b class="r">${rp(r.jumlah)}</b></div><div class="mu">${r.tanggal} - ${esc(r.keterangan)} (${esc(r.oleh)})</div><a href="#" data-x="${r.id}" style="color:var(--rd);font-size:13px">hapus</a></div>`).join(''):'<p class="mu">Belum ada pengeluaran bulan ini.</p>'}catch(e){toast(e.message)}}
 $('ksave').onclick=async()=>{try{await api('pengeluaranTambah',{kategori:$('kk').value.trim(),keterangan:$('kd').value.trim(),jumlah:$('kj').value,tanggal:$('kt').value});
  ['kk','kd','kj'].forEach(i=>$(i).value='');toast('Pengeluaran dicatat');loadKeluar()}catch(e){toast(e.message)}};
