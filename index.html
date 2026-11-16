@@ -199,8 +199,8 @@ async function loadDash(){try{const d=(await api('dashboard')).data;
  const c=(t,v,s,w)=>`<div class="card ${w?'wide':''}"><span class="mu">${t}</span><b>${v}</b>${s?`<span class="mu">${s}</span>`:''}</div>`;
  $('dash').innerHTML=c('Omset hari ini',rp(d.omsetHariIni),d.orderHariIni+' nota')+c('Uang masuk hari ini',rp(d.uangMasukHariIni),'sudah lunas')+
   c('Cucian hari ini',num(d.kgHariIni)+' Kg',d.pcsHariIni+' pcs/pasang',1)+
-  c('Omset bulan ini',rp(d.omsetBulanIni),d.orderBulanIni+' nota')+c('Pengeluaran bulan ini',rp(d.pengeluaranBulanIni))+
-  c('Laba bulan ini (omset - pengeluaran)',rp(d.labaBulanIni),'',1)+
+  c('Omset bulan ini',rp(d.omsetBulanIni),d.orderBulanIni+' nota, uang masuk '+rp(d.uangMasukBulanIni))+c('Pengeluaran bulan ini',rp(d.pengeluaranBulanIni))+
+  c('Laba bulan ini (uang masuk - pengeluaran)',rp(d.labaBulanIni),'',1)+
   c('Belum lunas',d.belumLunasJumlah+' nota',rp(d.belumLunasNominal))+c('Belum selesai',d.belumSelesai+' nota',d.belumDiambil+' selesai, belum diambil')
  }catch(e){toast(e.message)}}
 async function loadKeluar(){try{const d=(await api('pengeluaran')).data;$('ktot').textContent=rp(d.total);
@@ -257,7 +257,7 @@ function cetak(n){
  try{const bytes=rasterBytes(renderNota(n,2,true));let bin='';for(let i=0;i<bytes.length;i+=8192)bin+=String.fromCharCode.apply(null,bytes.slice(i,i+8192));
   location.href='intent:base64,'+btoa(bin)+'#Intent;scheme=rawbt;package=ru.a402d.rawbtprinter;end;'}
  catch(e){toast('Gagal menyiapkan cetakan: '+e.message)}}
-function waNum(w){let d=String(w||'').replace(/\D/g,'');if(d.startsWith('0'))d='62'+d.slice(1);return d}
+function waNum(w){let d=String(w||'').replace(/\D/g,'');if(d.startsWith('0'))d='62'+d.slice(1);else if(d.startsWith('8'))d='62'+d;return d}
 async function kirimWA(n){
  try{const c=renderNota(n,2),blob=await new Promise(r=>c.toBlob(r,'image/png')),file=new File([blob],n.noNota+'.png',{type:'image/png'});
   const text='Halo '+n.nama+', berikut nota Laundry Tetangga ('+n.noNota+'). Total '+rp(n.total)+'. Estimasi selesai: '+estimasi(n)+'. Terima kasih!';
