@@ -92,7 +92,7 @@ button,a,[data-i]{touch-action:manipulation;-webkit-tap-highlight-color:#1d7a6c2
 <div id="bb" class="hide"><div class="mu" id="bi"></div>
  <div class="row"><button data-k="s:Diambil">Diambil</button><button data-k="b:Cash">Lunas Cash</button><button data-k="b:QRIS">Lunas QRIS</button></div>
  <div class="row"><button data-k="a:Cash">Diambil + Cash</button><button data-k="a:QRIS">Diambil + QRIS</button></div>
- <div class="row"><button data-k="all">Pilih semua</button><button data-k="x">Batal</button></div></div>
+ <div class="row"><button data-k="d:" id="bdel" class="dng">Hapus</button><button data-k="p:" id="bpul" class="hide">Pulihkan</button><button data-k="all">Pilih semua</button><button data-k="x">Batal</button></div></div>
 <nav id="nav"></nav></div>
 
 <div id="modal"><div id="mbox"></div></div><div id="ld"></div><div id="wait"><span>Memproses...</span></div><div id="toast"></div>
@@ -191,7 +191,7 @@ function renderList(){const rows=$('list')._rows||[];
   return `<div class="card" data-i="${i}" style="cursor:pointer${on?';border-color:var(--g);background:#eaf4f1':''}"><div class="row" style="align-items:center"><b>${BULK?(on?'&#9745; ':'&#9744; '):''}${esc(r.nama)}</b><b class="r">${rp(r.total)}</b></div>
    <div class="mu">${r.noNota} - ${r.tanggal}</div><div style="margin-top:4px"><span class="bd ${r.status==='Dihapus'?'x':''}">${stl(r.status)}</span><span class="bd ${r.bayar==='Lunas'?'':'w'}">${r.bayar==='Lunas'?'Lunas'+(r.metode?' '+r.metode:''):'Belum lunas'}</span></div></div>`}).join(''):'<p class="mu">Tidak ada nota.</p>'}
 function stl(t){return t==='Diambil'?'Sudah diambil':t==='Dihapus'?'Dihapus':'Di laundry'}
-function bulkInfo(){$('bi').textContent=Object.keys(SELS).length+' nota dipilih'}
+function bulkInfo(){$('bi').textContent=Object.keys(SELS).length+' nota dipilih';const dl=$('fs').value==='Dihapus';$('bdel').classList.toggle('hide',dl);$('bpul').classList.toggle('hide',!dl)}
 function setBulk(on){BULK=on;SELS={};$('bm').textContent=on?'Keluar dari mode pilih banyak':'Pilih banyak nota';document.body.classList.toggle('bulk',on);$('bb').classList.toggle('hide',!on);renderList();bulkInfo()}
 $('bm').onclick=()=>setBulk(!BULK);
 const ymd=d=>d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
@@ -206,9 +206,10 @@ $('bb').onclick=async e=>{const k=e.target.dataset.k;if(!k)return;
  if(k==='all'){($('list')._rows||[]).forEach(r=>SELS[r.noNota]=1);renderList();return bulkInfo()}
  const ids=Object.keys(SELS);if(!ids.length)return toast('Pilih minimal satu nota');
  const [t,v]=k.split(':'),rows=$('list')._rows||[],unpaid=ids.filter(id=>rows.some(r=>r.noNota===id&&r.bayar!=='Lunas')).length;
- const msg=t==='s'?'Tandai '+ids.length+' nota sebagai sudah diambil?'+(unpaid?'\n'+unpaid+' di antaranya BELUM LUNAS.':''):t==='b'?'Tandai '+ids.length+' nota sebagai Lunas ('+v+')?':'Tandai '+ids.length+' nota sebagai diambil dan lunas ('+v+')?';
+ const msg=t==='d'?'Hapus '+ids.length+' nota? Owner lain akan diberi tahu.':t==='p'?'Pulihkan '+ids.length+' nota?':t==='s'?'Tandai '+ids.length+' nota sebagai sudah diambil?'+(unpaid?'\n'+unpaid+' di antaranya BELUM LUNAS.':''):t==='b'?'Tandai '+ids.length+' nota sebagai Lunas ('+v+')?':'Tandai '+ids.length+' nota sebagai diambil dan lunas ('+v+')?';
+ let alasan='';if(t==='d'){alasan=(prompt('Alasan menghapus '+ids.length+' nota (wajib):')||'').trim();if(!alasan)return toast('Alasan hapus wajib diisi')}
  if(!confirm(msg))return;
- try{const j=t==='s'?await api('statusBanyak',{noNotas:ids,value:v}):t==='b'?await api('bayarBanyak',{noNotas:ids,value:'Lunas',metode:v}):await api('ambilLunasBanyak',{noNotas:ids,metode:v});
+ try{const j=t==='d'?await api('hapusBanyak',{noNotas:ids,alasan}):t==='p'?await api('pulihBanyak',{noNotas:ids}):t==='s'?await api('statusBanyak',{noNotas:ids,value:v}):t==='b'?await api('bayarBanyak',{noNotas:ids,value:'Lunas',metode:v}):await api('ambilLunasBanyak',{noNotas:ids,metode:v});
   toast(j.berhasil+' nota diperbarui'+(j.dilewati?', '+j.dilewati+' dilewati':''));SELS={};await loadList()}catch(err){toast(err.message)}};
 $('list').onclick=e=>{const c=e.target.closest('[data-i]');if(!c)return;const r=$('list')._rows[+c.dataset.i];
  if(BULK){if(SELS[r.noNota])delete SELS[r.noNota];else SELS[r.noNota]=1;renderList();bulkInfo()}else detail(r)};
