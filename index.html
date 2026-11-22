@@ -88,6 +88,7 @@ button,a,[data-i]{touch-action:manipulation;-webkit-tap-highlight-color:#1d7a6c2
   <input id="kd" placeholder="Keterangan (opsional)"><input id="kj" type="text" inputmode="numeric" placeholder="Jumlah (Rp)">
   <input id="kt" type="date"><button class="pri" id="ksave">Catat pengeluaran</button></div>
   <div class="tot"><span>Bulan ini</span><span id="ktot"></span></div><div id="kper" class="card hide"></div><div id="klist"></div></section>
+<section id="v-kas" class="hide"><h2>Tutup kas harian</h2><input id="ktg" type="date"><div id="kasbox"></div></section>
 </main>
 <div id="bb" class="hide"><div class="mu" id="bi"></div>
  <div class="row"><button data-k="s:Diambil">Diambil</button><button data-k="b:Cash">Lunas Cash</button><button data-k="b:QRIS">Lunas QRIS</button></div>
@@ -105,7 +106,10 @@ const CFG={
  komplain:'Komplain pakaian hanya berlaku jika pakaian diambil maksimal 2 hari setelah selesai diproses, dan dikomplain maksimal 1 hari setelah pakaian diterima pelanggan dan dibuka. Di luar ketentuan tersebut, komplain tidak dapat diproses.',
  saran:'Kritik, saran, dan masukan terbuka kapan saja melalui WhatsApp Laundry Tetangga.',
  tutup1:'Jangan biarkan CUCIAN BERAT bikin harimu CAPEK, serahkan saja semuanya ke KAMI.',
- tutup2:'Terima kasih sudah berlangganan di Laundry Tetangga! 🥰'
+ tutup2:'Terima kasih sudah berlangganan di Laundry Tetangga! 🥰',
+ pesanBayar:'Untuk pembayarannya bebas ya Kak, bisa cash atau scan QRIS yang ada di album profil WA kami (kalau pakai QRIS, jangan lupa kirim bukti transfernya ya 📲✅).',
+ pesanInfo:'📌 Sekadar info tambahan ya Kak:\n\n* Laundry yang masuk di atas jam 17.00 akan diproses besok di jam kerja (08.00–17.00).\n* Untuk layanan antar-jemput 🛵, mohon info maksimal H-1 atau sebelum jam pengantaran (Pagi: 07.00–08.00 | Malam: 19.00–20.00). Di luar jam tersebut belum bisa kami layani, dan jarak di atas 1 km akan dikenakan biaya tambahan.',
+ pesanTutup:'Mohon maaf jika chat di luar jam operasional agak slow response 🙇‍♂️, tapi pasti segera kami balas. Terima kasih banyak sudah laundry di tempat kami, Kak! 🙏✨'
 };
 const $=id=>document.getElementById(id);
 const rp=n=>'Rp'+Number(n||0).toLocaleString('id-ID');
@@ -129,16 +133,16 @@ $('modal').onclick=e=>{if(e.target.id==='modal')closeModal()};
 async function login(){
  try{const [j,ly]=await Promise.all([api('login'),api('layanan')]);USER=j.user;localStorage.setItem('pin',PIN);LAY=ly.data;
   $('login').classList.add('hide');$('app').classList.remove('hide');$('who').textContent=USER.nama;
-  const tabs=USER.role==='owner'?[['dash','Ringkasan'],['nota','Nota'],['order','Order'],['keluar','Pengeluaran']]:[['order','Order'],['nota','Nota']];
+  const tabs=USER.role==='owner'?[['dash','Ringkasan'],['nota','Nota'],['order','Order'],['keluar','Pengeluaran'],['kas','Kas']]:[['order','Order'],['nota','Nota']];
   $('nav').innerHTML=tabs.map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join('');
   $('nav').onclick=e=>e.target.dataset.t&&show(e.target.dataset.t);
   if(USER.role==='owner'){$('bm').classList.remove('hide');$('rg').classList.remove('hide')}fillLay();show(tabs[0][0]);
  }catch(e){PIN='';toast(e.message==='Failed to fetch'?'Tidak bisa terhubung. Cek internet dan URL API.':e.message)}}
 $('go').onclick=()=>{PIN=$('pin').value.trim();login()};
 $('out').onclick=()=>{localStorage.removeItem('pin');location.reload()};
-function show(t){TAB=t;if(t!=='nota'&&BULK)setBulk(false);['dash','nota','order','keluar'].forEach(x=>$('v-'+x).classList.toggle('hide',x!==t));
+function show(t){TAB=t;if(t!=='nota'&&BULK)setBulk(false);['dash','nota','order','keluar','kas'].forEach(x=>$('v-'+x).classList.toggle('hide',x!==t));
  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
- if(t==='dash')loadDash();if(t==='nota')loadList();if(t==='keluar')loadKeluar()}
+ if(t==='dash')loadDash();if(t==='nota')loadList();if(t==='keluar')loadKeluar();if(t==='kas')loadKas()}
 setInterval(()=>{if(!USER||document.hidden||$('modal').style.display==='flex')return;
  if(TAB==='dash')loadDash();if(TAB==='nota'&&!BULK&&document.activeElement.id!=='q')loadList()},30000);
 
@@ -260,6 +264,37 @@ async function loadDash(){try{const d=(await api('dashboard')).data,HR=['Min','S
  <div class="pg"><div style="width:${pct}%"></div></div><span class="mu">Pengeluaran ${pct}% dari uang masuk &middot; omset ${rp(d.omsetBulanIni)} (${d.orderBulanIni} nota)</span></div>`
  }catch(e){toast(e.message)}}
 $('dash').onclick=e=>{const b=e.target.closest('[data-go]');if(!b)return;$('fs').value=b.dataset.go;show('nota')};
+let KS=null;
+async function loadKas(){if(!$('ktg').value)$('ktg').value=ymd(new Date());
+ try{KS=(await api('kasHari',{tanggal:$('ktg').value})).data;drawKas()}catch(e){toast(e.message)}}
+$('ktg').onchange=loadKas;
+const gk=id=>+($(id).value.replace(/\D/g,''))||0,fn=n=>Number(n).toLocaleString('id-ID');
+function drawKas(){const d=KS,a=d.ada,AK={'HAPUS':'Nota dihapus','RALAT':'Nota diralat','BAYAR':'Pembayaran dibatalkan','HAPUS PENGELUARAN':'Pengeluaran dihapus','UBAH PENGELUARAN':'Pengeluaran diubah','PULIHKAN':'Nota dipulihkan'};
+ const inp=(id,ph)=>`<input id="${id}" inputmode="numeric" placeholder="${ph}" style="width:140px;margin:0;text-align:right">`;
+ const flags=(d.tanda.length||d.lompat.length)?d.tanda.map(t=>`<div class="li"><div><b>${AK[t.aksi]||t.aksi}</b> ${esc(t.ref)}<div class="mu">${t.jam} oleh ${esc(t.oleh)}${t.alasan?' - '+esc(t.alasan):''}</div><div class="mu">${esc(t.sebelum)}${t.sesudah?' &rarr; '+esc(t.sesudah):''}</div></div></div>`).join('')+(d.lompat.length?`<div class="li"><div><b>Nomor nota hilang / lompat</b><div class="mu">${d.lompat.join(', ')}</div></div></div>`:''):'<p class="mu">Tidak ada nota dihapus atau diralat, tidak ada pembayaran dibatalkan, dan nomor nota berurutan.</p>';
+ $('kasbox').innerHTML=`<div class="card"><b>Seharusnya ada di laci</b>
+  <div class="li"><span>Kas awal${a?'':' (dari penutupan sebelumnya)'}</span>${inp('ka','Rp')}</div>
+  <div class="li"><span>+ Cash masuk <span class="mu">(${d.cashNota} nota)</span></span><b>${rp(d.cashMasuk)}</b></div>
+  <div class="li"><span>- Pengeluaran hari ini</span><b>${rp(d.pengeluaran)}</b></div>
+  <div class="li"><span>- Di antaranya non-tunai</span>${inp('kn','Rp')}</div>
+  <div class="li"><span>- Diambil / disetor owner</span>${inp('kd2','Rp')}</div>
+  <div class="li"><b>Kas seharusnya</b><b id="ks">Rp0</b></div></div>
+ <div class="card"><b>Hitung uang tunai di laci</b><input id="kf" inputmode="numeric" placeholder="Uang tunai di laci (Rp)" style="margin-top:8px"><div class="tot"><span>Selisih kas</span><span id="ksl">-</span></div></div>
+ <div class="card"><b>QRIS</b><div class="li"><span>Menurut sistem <span class="mu">(${d.qrisNota} nota)</span></span><b>${rp(d.qrisSistem)}</b></div>
+  <input id="kq" inputmode="numeric" placeholder="Total QRIS menurut mutasi / aplikasi (Rp)"><div class="tot"><span>Selisih QRIS</span><span id="kqs">-</span></div></div>
+ <input id="kc" placeholder="Catatan (opsional)"><button class="pri" id="kts">${a?'Perbarui penutupan kas':'Simpan penutupan kas'}</button>
+ <div class="card" style="margin-top:12px"><b>Perlu dicek</b>${flags}</div>
+ <div class="card"><b>Riwayat penutupan</b>${d.riwayat.length?d.riwayat.map(r=>`<div class="li"><span>${r.tgl.split('-').reverse().join('/')}</span><b class="${r.selisihKas===0?'g':'r2'}">${r.selisihKas===0?'Pas':'Selisih '+rp(r.selisihKas)}</b></div>`).join(''):'<p class="mu">Belum ada penutupan.</p>'}</div>`;
+ ['ka','kn','kd2','kf','kq'].forEach(i=>numIn($(i)));
+ $('ka').value=fn(a?a.kasAwal:d.kasAwalSaran);if(a){$('kn').value=fn(Math.max(0,d.pengeluaran-a.pengeluaran));$('kd2').value=fn(a.diambil);$('kf').value=fn(a.fisik);$('kc').value=a.catatan||'';if(a.qrisMutasi!=='')$('kq').value=fn(a.qrisMutasi)}
+ updKas()}
+function updKas(){if(!KS)return;const seh=gk('ka')+KS.cashMasuk-Math.max(0,KS.pengeluaran-gk('kn'))-gk('kd2');$('ks').textContent=rp(seh);
+ const sel=(el,v,ada)=>{el.textContent=!ada?'-':v===0?'Pas':(v>0?'Lebih ':'Kurang ')+rp(Math.abs(v));el.style.color=!ada?'':v===0?'var(--g)':v>0?'#b7791f':'var(--rd)'};
+ sel($('ksl'),gk('kf')-seh,$('kf').value!=='');sel($('kqs'),gk('kq')-KS.qrisSistem,$('kq').value!=='')}
+$('kasbox').oninput=updKas;
+$('kasbox').onclick=async e=>{if(e.target.id!=='kts')return;if($('kf').value==='')return toast('Isi uang tunai di laci dulu');
+ try{const j=await api('kasTutup',{tanggal:$('ktg').value,kasAwal:gk('ka'),nonKas:gk('kn'),diambil:gk('kd2'),kasFisik:gk('kf'),qrisMutasi:$('kq').value===''?'':gk('kq'),catatan:$('kc').value.trim()});
+  toast(j.data.selisihKas===0?'Kas pas. Tersimpan.':'Tersimpan. Ada selisih kas.');loadKas()}catch(err){toast(err.message)}};
 function numIn(el){el.oninput=()=>{const d=el.value.replace(/\D/g,'');el.value=d?Number(d).toLocaleString('id-ID'):''}}
 numIn($('kj'));
 async function loadKeluar(){try{const d=(await api('pengeluaran')).data;KAT=d.kategori;KROWS=d.rows;$('ktot').textContent=rp(d.total);
@@ -285,6 +320,16 @@ function jamLayanan(nm){return /express/i.test(nm)?4:/one\s*day/i.test(nm)?24:72
 function estimasi(n){const m=/(\d+)\/(\d+)\/(\d+) (\d+):(\d+)/.exec(n.tanggal||'');if(!m||!n.items.length)return '-';
  const h=Math.max.apply(null,n.items.map(i=>jamLayanan(i.layanan))),d=new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5]+h*60),p=v=>('0'+v).slice(-2);
  return HARI[d.getDay()]+', '+p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes())}
+// [est]
+const HARIF=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'],BLN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+function estDate(n){const m=/(\d+)\/(\d+)\/(\d+) (\d+):(\d+)/.exec(n.tanggal||'');if(!m||!n.items.length)return null;
+ return new Date(+m[3],+m[2]-1,+m[1],+m[4],+m[5]+Math.max.apply(null,n.items.map(i=>jamLayanan(i.layanan)))*60)}
+function estWA(n){const d=estDate(n),p=v=>('0'+v).slice(-2);return d?HARIF[d.getDay()]+', '+d.getDate()+' '+BLN[d.getMonth()]+' '+d.getFullYear()+', pukul '+p(d.getHours())+':'+p(d.getMinutes()):'-'}
+function estParts(n){const d=estDate(n),p=v=>('0'+v).slice(-2);return d?{hari:HARI[d.getDay()].toUpperCase(),tgl:p(d.getDate())+'/'+p(d.getMonth()+1),jam:p(d.getHours())+':'+p(d.getMinutes())}:null}
+function shortNo(n){const m=/^LD\d{4}(\d{2})-(\d+)$/.exec(n.noNota||'');return m?m[1]+'-'+m[2]:(n.noNota||'')}
+function pesanWA(n){const lunas=n.bayar==='Lunas';
+ return 'Halo Kak '+n.nama+' 👋, berikut kami sampaikan nota laundry kakak ya 🧾✨\n\n* Total Tagihan: Rp '+Number(n.total).toLocaleString('id-ID')+' 💵\n* Status Pembayaran: '+(lunas?'Lunas':'Belum Lunas')+'\n* Estimasi Selesai: '+estWA(n)+' ⏰\n\n'+(lunas?'':CFG.pesanBayar+'\n')+CFG.pesanInfo+'\n\n'+CFG.pesanTutup}
+// [/est]
 function renderNota(n,s,pr){
  const W=384,run=(cv)=>{const x=cv.getContext('2d');x.scale(s,s);x.fillStyle='#fff';x.fillRect(0,0,W,4000);x.fillStyle='#000';x.textBaseline='top';
   let y=6;const f=(z,b)=>x.font=(b?'700 ':'400 ')+z+'px system-ui,Roboto,Arial,sans-serif';
@@ -299,9 +344,9 @@ function renderNota(n,s,pr){
   if(pr)mid(CFG.tagline,11,1,14);mid(CFG.alamat,14,1,18);mid(CFG.wa,14,1,18);y+=16;dash();
   row('No',n.noNota,12,0,16);row('Masuk',n.tanggal,12,0,16);row('Estimasi',estimasi(n),12,1,17);row('Nama',n.nama,15,1,20);
   if(n.keterangan)left('Ket: '+n.keterangan,12,0,15);dash();
-  n.items.forEach(i=>{const sub=i.subtotal!=null?i.subtotal:Math.round(i.qty*i.harga);
-   f(13,1);const nm=wrap(i.layanan,13,1,W-95);nm.forEach((l,k)=>{f(13,1);t(l,10,'left');if(k===0){t(Number(sub).toLocaleString('id-ID'),W-10,'right')}y+=16});
-   row(num(i.qty)+' '+(i.satuan||'')+' x '+Number(i.harga).toLocaleString('id-ID'),'',11,0,14)});
+  n.items.forEach((i,ix)=>{const sub=i.subtotal!=null?i.subtotal:Math.round(i.qty*i.harga);
+   const nm=wrap(i.layanan,13,1,W-120);nm.forEach((l,k)=>{f(13,1);if(k===0)t((ix+1)+'.',10,'left');t(l,28,'left');if(k===0){t(Number(sub).toLocaleString('id-ID'),W-10,'right')}y+=16});
+   f(11,0);t(num(i.qty)+' '+(i.satuan||'')+' x '+Number(i.harga).toLocaleString('id-ID'),28,'left');y+=14});
   dash();
   x.fillStyle='#000';x.fillRect(8,y,W-16,28);x.fillStyle='#fff';y+=4;f(17,1);t('TOTAL',16,'left');t(rp(n.total),W-16,'right');y+=24;x.fillStyle='#000';y+=8;
   const bt=n.bayar==='Lunas'?'LUNAS - '+(n.metode||'Cash').toUpperCase():'BELUM LUNAS';
@@ -322,7 +367,7 @@ function rasterBytes(src){ // canvas -> ESC/POS (384 titik, 48 byte per baris)
   for(let y=y0;y<y0+hh;y++)for(let b=0;b<wb;b++){let v=0;for(let k=0;k<8;k++){const i=(y*W+b*8+k)*4;if(d[i]*.3+d[i+1]*.59+d[i+2]*.11<165)v|=0x80>>k}o.push(v)}}
  o.push(0x1b,0x64,2);return o}
 // ===== Printer: RawBT atau Bluetooth langsung (BLE) =====
-let PM=localStorage.getItem('pm')||'rawbt',BC=+(localStorage.getItem('bc')||20),BLE=null;
+let PM=localStorage.getItem('pm')||'ble',BC=+(localStorage.getItem('bc')||20),BLE=null;
 const BSV=['000018f0-0000-1000-8000-00805f9b34fb','0000ff00-0000-1000-8000-00805f9b34fb','0000ffe0-0000-1000-8000-00805f9b34fb','0000fee7-0000-1000-8000-00805f9b34fb','e7810a71-73ae-499d-8c15-faa9aef0c3f2','49535343-fe7d-4ae5-8fa9-9fafd205e455','0000ae30-0000-1000-8000-00805f9b34fb'];
 async function bleOpen(dev){
  const srv=await dev.gatt.connect();let ch=null,svs=[];
@@ -371,27 +416,31 @@ function escposNota(n){
  add([0x1b,0x64,3]);return o}
 
 // Label cucian: teks pendek (sekitar 12 baris) untuk ditempel pada cucian
+// [label]
 function labelBytes(n){
  const o=[],A=t=>String(t==null?'':t).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\x20-\x7e]/g,''),
  add=a=>{for(let i=0;i<a.length;i++)o.push(a[i])},ln=t=>{t=A(t);for(let i=0;i<t.length;i++)o.push(t.charCodeAt(i));o.push(10)},
  SZ=k=>add([0x1d,0x21,k]),B=on=>add([0x1b,0x45,on?1:0]),AL=k=>add([0x1b,0x61,k]),RV=on=>add([0x1d,0x42,on?1:0]),
- f=v=>Number(v).toLocaleString('id-ID'),D='-'.repeat(32),
- rw=(l,r)=>{l=A(l);r=A(r);return l+' '.repeat(Math.max(1,32-l.length-r.length))+r};
- add([0x1b,0x40]);AL(1);B(1);SZ(0x11);ln(n.noNota);SZ(0);ln(D);
- AL(0);SZ(0x01);ln(A(n.nama).slice(0,32));SZ(0);B(0);
+ f=v=>Number(v).toLocaleString('id-ID'),D='-'.repeat(32),E='='.repeat(32),
+ wr=(t,c)=>{const r=[];let l='';A(t).split(' ').forEach(w=>{const k=l?l+' '+w:w;if(k.length>c&&l){r.push(l);l=w}else l=k});r.push(l);return r.map(x=>x.slice(0,c))},
+ e=estParts(n)||{hari:'-',tgl:'',jam:''};
+ add([0x1b,0x40]);AL(1);ln(E);
+ B(1);SZ(0x33);ln(shortNo(n));SZ(0);
+ SZ(0x11);wr(n.nama,16).slice(0,2).forEach(t=>ln(t));SZ(0);B(0);
+ ln(D);AL(0);
  const it=n.items.map(i=>i.layanan+' '+num(i.qty)+' '+(i.satuan||''));
  it.slice(0,4).forEach(t=>ln(t.slice(0,32)));if(it.length>4)ln('+'+(it.length-4)+' item lainnya');
  if(n.keterangan)ln(('Ket: '+n.keterangan).slice(0,32));
- ln(D);B(1);SZ(0x01);ln(rw('Total','Rp'+f(n.total)));SZ(0);B(0);
- AL(1);RV(1);B(1);SZ(0x11);ln(' '+(n.bayar==='Lunas'?'LUNAS '+(n.metode||'Cash').toUpperCase():'BELUM LUNAS')+' ');SZ(0);B(0);RV(0);
- AL(0);ln(rw('Masuk',n.tanggal));ln(rw('Estimasi',estimasi(n)));
+ AL(1);ln(D);ln('SELESAI');B(1);SZ(0x22);ln(e.hari+' '+e.tgl);SZ(0x11);ln('jam '+e.jam);SZ(0);ln(D);
+ SZ(0x11);ln('Rp'+f(n.total));SZ(0);
+ RV(1);SZ(0x11);ln(' '+(n.bayar==='Lunas'?'LUNAS '+(n.metode||'Cash').toUpperCase():'BELUM LUNAS')+' ');SZ(0);RV(0);B(0);
+ ln('Masuk '+(n.tanggal||'').slice(0,16));ln(E);
  add([0x1b,0x64,3]);return o}
+// [/label]
 async function cetakLabel(n){try{await kirimCetak(labelBytes(n))}catch(e){toast('Gagal mencetak: '+e.message)}}
 function kirimTeks(n){
  if(!n.wa)return toast('Nomor WA pelanggan belum diisi');
- const L=n.items.map(i=>'- '+i.layanan+' '+num(i.qty)+' '+(i.satuan||'')+' x '+Number(i.harga).toLocaleString('id-ID')+' = '+rp(i.subtotal!=null?i.subtotal:Math.round(i.qty*i.harga))).join('\n');
- const t='*Laundry Tetangga*\nHalo Kak '+n.nama+', terima kasih sudah laundry di tempat kami.\n\nNota: '+n.noNota+'\nMasuk: '+n.tanggal+'\nEstimasi selesai: '+estimasi(n)+'\n\n'+L+'\n\n*Total: '+rp(n.total)+'*\nStatus: *'+(n.bayar==='Lunas'?'LUNAS ('+(n.metode||'Cash')+')':'BELUM LUNAS')+'*\n\nMohon dibaca ya Kakak \u{1F60A}\n1. '+CFG.komplain+'\n2. '+CFG.saran+'\n\n'+CFG.tutup1+'\n'+CFG.tutup2;
- window.open('https://wa.me/'+waNum(n.wa)+'?text='+encodeURIComponent(t),'_blank')}
+ window.open('https://wa.me/'+waNum(n.wa)+'?text='+encodeURIComponent(pesanWA(n)),'_blank')}
 async function cetak(n){try{await kirimCetak(PM==='ble'?escposNota(n):rasterBytes(renderNota(n,2,true)))}catch(e){toast('Gagal mencetak: '+e.message)}}
 $('pr').onclick=()=>{
  modal(`<h2>Printer</h2><div class="mu" style="margin-bottom:6px">Cara mencetak</div>
@@ -407,7 +456,7 @@ $('pr').onclick=()=>{
 function waNum(w){let d=String(w||'').replace(/\D/g,'');if(d.startsWith('0'))d='62'+d.slice(1);else if(d.startsWith('8'))d='62'+d;return d}
 async function kirimWA(n){
  try{const c=renderNota(n,2),blob=await new Promise(r=>c.toBlob(r,'image/png')),file=new File([blob],n.noNota+'.png',{type:'image/png'});
-  const text='Halo '+n.nama+', berikut nota Laundry Tetangga ('+n.noNota+'). Total '+rp(n.total)+'. Estimasi selesai: '+estimasi(n)+'. Terima kasih!';
+  const text=pesanWA(n);
   if(navigator.canShare&&navigator.canShare({files:[file]}))await navigator.share({files:[file],text});
   else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=n.noNota+'.png';a.click();
    toast('Foto nota tersimpan. Lampirkan manual di chat WA.');if(n.wa)window.open('https://wa.me/'+waNum(n.wa)+'?text='+encodeURIComponent(text))}}
