@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="id"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1d7a6c"><title>Kasir Laundry Tetangga</title>
+<meta name="theme-color" content="#1d7a6c"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icon-180.png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Kasir Laundry"><title>Kasir Laundry Tetangga</title>
 <style>
 :root{--g:#1d7a6c;--g2:#4aa89a;--y:#f5c518;--bg:#f3f7f6;--tx:#17302b;--mu:#6b7f7a;--ln:#d9e4e1;--rd:#c0392b}
 *{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,Roboto,sans-serif;background:var(--bg);color:var(--tx);padding-bottom:76px}
@@ -48,6 +48,7 @@ button,a,[data-i]{touch-action:manipulation;-webkit-tap-highlight-color:#1d7a6c2
 .pg{height:8px;background:#e3efec;border-radius:99px;overflow:hidden;margin-bottom:6px}.pg div{height:100%;background:linear-gradient(90deg,var(--y),#e67e22)}
 .tiles button{display:flex;flex-direction:column;align-items:center;padding:12px 4px;border-radius:12px;border:0;font-weight:400;color:var(--tx)}.tiles b{font-size:22px}.tiles span{font-size:12px}.tiles small{font-size:11px}
 .t1{background:#fdf1c9}.t2{background:#dcecf7}.t3{background:#f8dcd8}
+#upd{position:fixed;left:10px;right:10px;top:10px;z-index:97;background:#17302b;color:#fff;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;box-shadow:0 2px 12px #0005}#upd button{padding:6px 14px;width:auto}
 #toast{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#17302b;color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:99;max-width:90%}
 #login{max-width:340px;margin:20vh auto;text-align:center;padding:0 16px}#login img{width:200px}
 .hide{display:none!important}
@@ -55,7 +56,7 @@ button,a,[data-i]{touch-action:manipulation;-webkit-tap-highlight-color:#1d7a6c2
 
 <div id="login"><img src="logo.png" alt="Laundry Tetangga"><h2>Masuk</h2>
 <input id="pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off">
-<button class="pri" id="go">Masuk</button></div>
+<button class="pri" id="go">Masuk</button><button id="inst" class="hide" style="width:100%;margin-top:10px">Pasang sebagai aplikasi</button></div>
 
 <div id="app" class="hide">
 <header><div><b>Laundry Tetangga</b><br><small id="who"></small></div><div class="row" style="flex:0 0 auto;gap:6px"><button id="pr" style="padding:6px 12px;background:none;color:#fff;border-color:#fff8">Printer</button><button id="out" style="padding:6px 12px;background:none;color:#fff;border-color:#fff8">Keluar</button></div></header>
@@ -96,10 +97,11 @@ button,a,[data-i]{touch-action:manipulation;-webkit-tap-highlight-color:#1d7a6c2
  <div class="row"><button data-k="d:" id="bdel" class="dng">Hapus</button><button data-k="p:" id="bpul" class="hide">Pulihkan</button><button data-k="all">Pilih semua</button><button data-k="x">Batal</button></div></div>
 <nav id="nav"></nav></div>
 
-<div id="modal"><div id="mbox"></div></div><div id="ld"></div><div id="wait"><span>Memproses...</span></div><div id="toast"></div>
+<div id="modal"><div id="mbox"></div></div><div id="upd" class="hide"><span>Versi baru tersedia</span><button id="updb">Perbarui</button></div><div id="ld"></div><div id="wait"><span>Memproses...</span></div><div id="toast"></div>
 
 <script>
 // ====== PENGATURAN ======
+const VERSI='1.1-pwa';
 const CFG={
  api:'https://script.google.com/macros/s/AKfycbwXG7HX7EUGX1fY13ixfxJi-E0yiyT-WcefVpwn_h6TIIMJbu-5QYg_C2uAMUyGyKEb/exec',
  alamat:'Gang Ratna, Jl. Sedap Malam',wa:'WA 0859-6265-4475',tagline:'Gratis antar jemput - Sesama tetangga',
@@ -449,7 +451,7 @@ $('pr').onclick=()=>{
  <div class="mu" style="margin:10px 0 6px">Kecepatan kirim (Bluetooth langsung)</div>
  <div class="row" id="pcr"><button data-c="20" class="${BC<=20?'on':''}">Aman</button><button data-c="180" class="${BC>20?'on':''}">Cepat</button></div>
  <p class="mu">Label cucian berupa teks pendek, cepat di kedua cara. Nota lengkap lewat Bluetooth langsung dicetak versi ringkas, lewat RawBT dicetak tampilan penuh. Bluetooth langsung hanya bisa jika printer mendukung Bluetooth LE. Putuskan printer dari aplikasi lain sebelum mencoba.</p>
- <button class="pri" id="pt">Tes cetak</button><button id="pc" style="width:100%;margin-top:8px;border-color:var(--ln);color:var(--mu)">Tutup</button>`);
+ <p class="mu">Versi aplikasi: ${VERSI}</p><button class="pri" id="pt">Tes cetak</button><button id="pc" style="width:100%;margin-top:8px;border-color:var(--ln);color:var(--mu)">Tutup</button>`);
  $('pmr').onclick=e=>{const m=e.target.dataset.m;if(!m)return;PM=m;localStorage.setItem('pm',m);document.querySelectorAll('#pmr button').forEach(b=>b.classList.toggle('on',b.dataset.m===m))};
  $('pcr').onclick=e=>{const c=e.target.dataset.c;if(!c)return;BC=+c;localStorage.setItem('bc',c);document.querySelectorAll('#pcr button').forEach(b=>b.classList.toggle('on',b.dataset.c===c))};
  $('pc').onclick=closeModal;
@@ -470,6 +472,14 @@ function showNota(n,baru){
  <div class="row"><button id="b5" style="border-color:var(--ln);color:var(--mu)">Cetak nota lengkap</button><button id="b3" style="border-color:var(--ln);color:var(--mu)">Selesai</button></div>`);
  $('pv').appendChild(c);$('b1').onclick=()=>cetakLabel(n);$('b2').onclick=()=>kirimWA(n);$('b4').onclick=()=>kirimTeks(n);$('b5').onclick=()=>cetak(n);$('b3').onclick=closeModal}
 
+// ===== PWA: pasang, pembaruan otomatis =====
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+let IP=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();IP=e;$('inst').classList.remove('hide')});
+$('inst').onclick=async()=>{if(!IP)return;IP.prompt();await IP.userChoice;IP=null;$('inst').classList.add('hide')};
+window.addEventListener('appinstalled',()=>$('inst').classList.add('hide'));
+async function cekVersi(){try{const t=await(await fetch('index.html?v='+Date.now(),{cache:'no-store'})).text(),m=/const VERSI='([^']+)'/.exec(t);if(m&&m[1]!==VERSI)$('upd').classList.remove('hide')}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)cekVersi()});setInterval(cekVersi,30*60*1000);
+$('updb').onclick=()=>location.reload();
 LOGO.onload=()=>{};
 if(PIN)login();
 </script></body></html>
